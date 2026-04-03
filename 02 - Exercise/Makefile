@@ -9,7 +9,7 @@ CONTAINER_RUN = $(CONTAINER_RUNTIME) run --rm 	-v "$(PROJECT_MOUNT)" 	-w $(WORKD
 
 CONTAINER_RUN_TTY = $(CONTAINER_RUNTIME) run --rm -it 	-v "$(PROJECT_MOUNT)" 	-w $(WORKDIR) 	-e PYTHONPATH=$(WORKDIR)/src 	-e SPARK_LOCAL_IP=127.0.0.1 	$(IMAGE_NAME)
 
-.PHONY: help image compile ingest-bronze build-silver build-gold-purchase-snapshot shell pyspark smoke
+.PHONY: help image compile ingest-bronze build-silver build-gold-purchase-snapshot build-gold-gmv-daily-by-subsidiary shell pyspark smoke
 
 help:
 	@printf '%s\n' 'Available targets:'
@@ -18,6 +18,7 @@ help:
 	@printf '%s\n' '  make ingest-bronze   Load the sample txt files into local bronze Iceberg tables'
 	@printf '%s\n' '  make build-silver    Rebuild the local bronze sample and materialize the silver CDC tables'
 	@printf '%s\n' '  make build-gold-purchase-snapshot  Rebuild bronze and silver, then materialize the gold purchase snapshot'
+	@printf '%s\n' '  make build-gold-gmv-daily-by-subsidiary  Rebuild the full pipeline and materialize the final GMV aggregate'
 	@printf '%s\n' '  make pyspark         Open an interactive Spark console already pointed at ae_challenge'
 	@printf '%s\n' '  make shell           Open an interactive shell inside the container'
 	@printf '%s\n' '  make ingest-bronze BIND_MOUNT_SUFFIX=    Disable SELinux relabel when needed'
@@ -36,6 +37,9 @@ build-silver: ingest-bronze
 
 build-gold-purchase-snapshot: build-silver
 	$(CONTAINER_RUN) python scripts/build_gold_purchase_snapshot_local.py --reset
+
+build-gold-gmv-daily-by-subsidiary: build-gold-purchase-snapshot
+	$(CONTAINER_RUN) python scripts/build_gold_gmv_daily_by_subsidiary_local.py --reset
 
 smoke: ingest-bronze
 

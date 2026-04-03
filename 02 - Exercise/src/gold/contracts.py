@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 GOLD_PURCHASE_STATE_SNAPSHOT_TABLE = 'gold_purchase_state_snapshot'
+GOLD_GMV_DAILY_BY_SUBSIDIARY_SNAPSHOT_TABLE = 'gold_gmv_daily_by_subsidiary_snapshot'
+GOLD_GMV_DAILY_BY_SUBSIDIARY_CURRENT_VIEW = 'vw_gmv_daily_by_subsidiary_current'
 
 SILVER_INPUT_TABLES = {
     'purchase': 'silver_purchase_cdc',
@@ -55,4 +57,16 @@ GOLD_PURCHASE_STATE_SNAPSHOT_COLUMNS = (
     'order_transaction_cost_hist_source_transaction_datetime',
     'order_transaction_cost_hist_source_transaction_date',
     'order_transaction_cost_hist_source_record_hash',
+)
+
+GOLD_GMV_DAILY_BY_SUBSIDIARY_COLUMNS = (
+    'snapshot_date',
+    'gmv_date',
+    'subsidiary',
+    'gmv_daily_amount',
+    'gmv_daily_purchase_count',
+    'gmv_daily_item_quantity',
+    'gmv_mtd_amount',
+    'quality_status',
+    'snapshot_created_at',
 )
