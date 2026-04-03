@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Testes e cobertura
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Qualidade e tipagem
+.mypy_cache/
+.ruff_cache/
+
+# Ambientes locais
+.venv/
+venv/
+
+# IDE e sistema operacional
+.vscode/
+.idea/
+.DS_Store
+
+# Artefatos locais de Spark e Iceberg
+.local/
+metastore_db/
+spark-warehouse/
+derby.log
+
+# Jupyter
+.ipynb_checkpoints/
