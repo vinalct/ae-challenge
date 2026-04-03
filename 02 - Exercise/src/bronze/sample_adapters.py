@@ -45,10 +45,10 @@ def _align_to_source_schema(
     expressions = []
     for field in schema.fields:
         source_column = column_mapping.get(field.name, field.name)
-        if field.name in default_values:
-            expression = F.lit(default_values[field.name])
-        elif source_column in raw_df.columns:
+        if source_column in raw_df.columns:
             expression = F.col(source_column)
+        elif field.name in default_values:
+            expression = F.lit(default_values[field.name])
         else:
             expression = F.lit(None)
         expressions.append(expression.cast(field.dataType).alias(field.name))
@@ -99,7 +99,10 @@ def _build_product_item_load(
         raise FileNotFoundError(f'Arquivo obrigatorio nao encontrado: {source_path}')
 
     raw_df = _read_sample_txt(spark, source_path)
-    joined_df = raw_df.join(purchase_lookup, on='purchase_id', how='left')
+    if 'prod_item_id' in raw_df.columns:
+        joined_df = raw_df
+    else:
+        joined_df = raw_df.join(purchase_lookup, on='purchase_id', how='left')
     normalized_df = _align_to_source_schema(
         raw_df=joined_df,
         source_name='product_item',

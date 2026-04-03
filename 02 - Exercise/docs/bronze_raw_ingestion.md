@@ -57,10 +57,10 @@ Descrever como a camada bronze foi modelada e como o fluxo de ingestao utiliza o
 
 ## Ajustes feitos para a amostra local
 
-- `purchase.txt` nao traz `purchase_partition`, `prod_item_partition`, `purchase_total_value` e `purchase_status`; a adaptacao local preenche os campos tecnicos de particao com valor fixo `1` e mantem os campos ausentes como `null`.
-- `product_item.txt` usa `purchase_id` em vez de `prod_item_id`; a adaptacao local resolve `prod_item_id` a partir da amostra de `purchase`.
-- `purchase_extra_info.txt` nao traz `purchase_partition`; a adaptacao local preenche esse campo com valor fixo `1`.
-- `order_transaction_cost_hist.txt` e opcional no fluxo local. Se o arquivo nao existir, a carga segue sem essa origem.
+- `purchase.txt` agora carrega explicitamente `purchase_partition`, `prod_item_partition`, `purchase_total_value` e `purchase_status` com valores sinteticos para a massa de exemplo.
+- `product_item.txt` agora carrega `prod_item_id` e `prod_item_partition`; a coluna auxiliar `purchase_id` pode continuar presente na amostra e e ignorada pelo alinhamento ao schema canonico.
+- `purchase_extra_info.txt` agora carrega `purchase_partition` explicitamente.
+- `order_transaction_cost_hist.txt` continua opcional no fluxo local. Se o arquivo nao existir, a carga segue sem essa origem.
 
 ## Observacoes
 
