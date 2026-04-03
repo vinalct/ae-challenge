@@ -10,6 +10,7 @@ from pyspark.sql import DataFrame, SparkSession
 
 from common.sql import execute_sql_file
 from common.source_schemas import SOURCE_SCHEMAS, get_source_schema
+from .contracts import BRONZE_TABLE_SPECS
 from .ingestion import append_bronze_events
 
 SUPPORTED_BRONZE_SOURCES = frozenset(SOURCE_SCHEMAS)
@@ -38,7 +39,7 @@ def prepare_bronze_tables(
     catalog: str | None = None,
     reset_namespace: bool = False,
 ) -> None:
-    """Executa o DDL da bronze e opcionalmente recria o namespace."""
+    """Executa o DDL da bronze e opcionalmente recria apenas as tabelas da camada."""
     ddl_path_obj = Path(ddl_path)
     if not ddl_path_obj.exists():
         raise FileNotFoundError(f'Arquivo DDL nao encontrado: {ddl_path_obj}')
@@ -46,8 +47,9 @@ def prepare_bronze_tables(
     if reset_namespace:
         if not namespace:
             raise ValueError('namespace must be provided when reset_namespace=True.')
-        full_namespace_name = build_namespace_name(namespace=namespace, catalog=catalog)
-        spark.sql(f'DROP NAMESPACE IF EXISTS {full_namespace_name} CASCADE')
+        for spec in BRONZE_TABLE_SPECS.values():
+            full_table_name = build_namespace_name(namespace=namespace, catalog=catalog)
+            spark.sql(f'DROP TABLE IF EXISTS {full_table_name}.{spec.target_table}')
 
     execute_sql_file(spark, ddl_path_obj)
 

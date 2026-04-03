@@ -44,7 +44,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         '--reset',
         action='store_true',
-        help='Remove e recria o namespace local antes da carga.',
+        help='Remove e recria apenas as tabelas bronze locais antes da carga.',
     )
     return parser.parse_args()
 
