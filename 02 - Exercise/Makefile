@@ -9,16 +9,18 @@ CONTAINER_RUN = $(CONTAINER_RUNTIME) run --rm 	-v "$(PROJECT_MOUNT)" 	-w $(WORKD
 
 CONTAINER_RUN_TTY = $(CONTAINER_RUNTIME) run --rm -it 	-v "$(PROJECT_MOUNT)" 	-w $(WORKDIR) 	-e PYTHONPATH=$(WORKDIR)/src 	-e SPARK_LOCAL_IP=127.0.0.1 	$(IMAGE_NAME)
 
-.PHONY: help image compile ingest-bronze build-silver build-gold-purchase-snapshot build-gold-gmv-daily-by-subsidiary shell pyspark smoke
+.PHONY: help image compile test ingest-bronze build-silver build-gold-purchase-snapshot build-gold-gmv-daily-by-subsidiary run-data-quality shell pyspark smoke
 
 help:
 	@printf '%s\n' 'Available targets:'
 	@printf '%s\n' '  make image           Build the local container image'
 	@printf '%s\n' '  make compile         Run Python compile checks inside the container'
+	@printf '%s\n' '  make test            Run the PySpark unit, integration, and data-quality tests inside the container'
 	@printf '%s\n' '  make ingest-bronze   Load the sample txt files into local bronze Iceberg tables'
 	@printf '%s\n' '  make build-silver    Rebuild the local bronze sample and materialize the silver CDC tables'
 	@printf '%s\n' '  make build-gold-purchase-snapshot  Rebuild bronze and silver, then materialize the gold purchase snapshot'
 	@printf '%s\n' '  make build-gold-gmv-daily-by-subsidiary  Rebuild the full pipeline and materialize the final GMV aggregate'
+	@printf '%s\n' '  make run-data-quality  Rebuild the full pipeline, publish OPS audit tables, and fail on blocking quality checks'
 	@printf '%s\n' '  make pyspark         Open an interactive Spark console already pointed at ae_challenge'
 	@printf '%s\n' '  make shell           Open an interactive shell inside the container'
 	@printf '%s\n' '  make ingest-bronze BIND_MOUNT_SUFFIX=    Disable SELinux relabel when needed'
@@ -27,7 +29,10 @@ image:
 	$(CONTAINER_RUNTIME) build -t $(IMAGE_NAME) .
 
 compile:
-	$(CONTAINER_RUN) python -m compileall src scripts
+	$(CONTAINER_RUN) python -m compileall src scripts tests
+
+test:
+	$(CONTAINER_RUN) pytest -q
 
 ingest-bronze:
 	$(CONTAINER_RUN) python scripts/ingest_bronze_local.py --reset
@@ -40,6 +45,9 @@ build-gold-purchase-snapshot: build-silver
 
 build-gold-gmv-daily-by-subsidiary: build-gold-purchase-snapshot
 	$(CONTAINER_RUN) python scripts/build_gold_gmv_daily_by_subsidiary_local.py --reset
+
+run-data-quality: build-gold-gmv-daily-by-subsidiary
+	$(CONTAINER_RUN) python scripts/run_data_quality_local.py --reset
 
 smoke: ingest-bronze
 
