@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 from pyspark.errors.exceptions.captured import UnsupportedOperationException
 from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import functions as F
 
+from common.load_mode import FULL_REFRESH_MODE, INCREMENTAL_MODE
 from common.sql import execute_sql_file
 from .contracts import (
     GOLD_GMV_DAILY_BY_SUBSIDIARY_CURRENT_VIEW,
@@ -104,27 +107,37 @@ def _read_purchase_snapshot_dataframe(
     spark: SparkSession,
     namespace: str,
     catalog: str | None = None,
+    target_snapshot_date: date | None = None,
 ) -> DataFrame:
     """Le a tabela gold_purchase_state_snapshot usada como base do agregado final."""
-    return spark.table(
+    df = spark.table(
         build_table_name(
             namespace=namespace,
             table_name=GOLD_PURCHASE_STATE_SNAPSHOT_TABLE,
             catalog=catalog,
         )
     )
+    if target_snapshot_date is None:
+        return df
+    return df.where(F.col('snapshot_date') == F.lit(target_snapshot_date).cast('date'))
 
 
 def load_gmv_daily_by_subsidiary(
     spark: SparkSession,
     namespace: str,
     catalog: str | None = None,
+    load_mode: str = FULL_REFRESH_MODE,
+    target_snapshot_date: date | None = None,
 ) -> tuple[int, bool]:
     """Materializa a tabela final de GMV e tenta recriar a view do snapshot mais recente."""
+    if load_mode == INCREMENTAL_MODE and target_snapshot_date is None:
+        raise ValueError('target_snapshot_date is required when load_mode=incremental.')
+
     purchase_snapshot_df = _read_purchase_snapshot_dataframe(
         spark=spark,
         namespace=namespace,
         catalog=catalog,
+        target_snapshot_date=(target_snapshot_date if load_mode == INCREMENTAL_MODE else None),
     )
     gmv_df = build_gmv_daily_by_subsidiary_dataframe(purchase_snapshot_df)
     snapshot_table_name = build_table_name(
@@ -133,8 +146,15 @@ def load_gmv_daily_by_subsidiary(
         catalog=catalog,
     )
     row_count = int(gmv_df.count())
-    spark.sql(f'DELETE FROM {snapshot_table_name} WHERE 1 = 1')
-    gmv_df.writeTo(snapshot_table_name).append()
+    if load_mode == INCREMENTAL_MODE:
+        spark.sql(
+            f"DELETE FROM {snapshot_table_name} WHERE snapshot_date = DATE '{target_snapshot_date.isoformat()}'"
+        )
+    else:
+        spark.sql(f'DELETE FROM {snapshot_table_name} WHERE 1 = 1')
+
+    if row_count > 0:
+        gmv_df.writeTo(snapshot_table_name).append()
     current_view_created = refresh_current_gmv_view(
         spark=spark,
         namespace=namespace,

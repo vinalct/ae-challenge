@@ -7,6 +7,9 @@ Descrever como a agregacao final transforma `gold_purchase_state_snapshot` em um
 ## Artefatos implementados
 
 - DDL da tabela final: [`sql/ddl/gold_gmv_daily_by_subsidiary_snapshot.sql`](../sql/ddl/gold_gmv_daily_by_subsidiary_snapshot.sql)
+- DDL da view de acesso atual: [`sql/access/vw_gmv_daily_by_subsidiary_current.sql`](../sql/access/vw_gmv_daily_by_subsidiary_current.sql)
+- Query final para consumo atual: [`sql/access/select_current_gmv_daily_by_subsidiary.sql`](../sql/access/select_current_gmv_daily_by_subsidiary.sql)
+- Exemplo populado da saida final: [`examples/gold_gmv_daily_by_subsidiary_snapshot_example.csv`](../examples/gold_gmv_daily_by_subsidiary_snapshot_example.csv)
 - Contratos gold: [`src/gold/contracts.py`](../src/gold/contracts.py)
 - Agregacao PySpark: [`src/gold/gmv_daily.py`](../src/gold/gmv_daily.py)
 - Loader e acesso atual: [`src/gold/gmv_loader.py`](../src/gold/gmv_loader.py)

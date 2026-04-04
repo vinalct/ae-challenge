@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from functools import reduce
 
 from pyspark.sql import DataFrame, Window
@@ -30,8 +31,17 @@ def _prefix_columns(df: DataFrame, prefix: str) -> DataFrame:
     return df.select([F.col(column_name).alias(f'{prefix}{column_name}') for column_name in df.columns])
 
 
-def _build_snapshot_calendar(silver_dataframes: dict[str, DataFrame]) -> DataFrame:
-    """Cria o calendario diario entre a menor e a maior transaction_date disponiveis."""
+def _build_snapshot_calendar(
+    silver_dataframes: dict[str, DataFrame],
+    target_snapshot_date: date | None = None,
+) -> DataFrame:
+    """Cria o calendario diario historico completo ou de um unico snapshot incremental."""
+    if target_snapshot_date is not None:
+        spark = next(iter(silver_dataframes.values())).sparkSession
+        return spark.range(1).select(
+            F.lit(target_snapshot_date).cast('date').alias('snapshot_date')
+        )
+
     date_dataframes = [
         _valid_snapshot_input(df)
         .where(F.col('transaction_date').isNotNull())
@@ -190,10 +200,14 @@ def _add_gold_quality_columns(df: DataFrame) -> DataFrame:
 def build_purchase_state_snapshot_dataframe(
     silver_dataframes: dict[str, DataFrame],
     snapshot_created_at: str | None = None,
+    target_snapshot_date: date | None = None,
 ) -> DataFrame:
     """Monta o snapshot historico diario por compra a partir da silver CDC."""
     purchase_input_df = _valid_snapshot_input(silver_dataframes['purchase'])
-    snapshot_calendar_df = _build_snapshot_calendar(silver_dataframes)
+    snapshot_calendar_df = _build_snapshot_calendar(
+        silver_dataframes,
+        target_snapshot_date=target_snapshot_date,
+    )
     purchase_snapshot_base_df = _build_purchase_snapshot_base(
         purchase_df=purchase_input_df,
         snapshot_calendar_df=snapshot_calendar_df,

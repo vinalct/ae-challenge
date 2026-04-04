@@ -63,6 +63,10 @@ def load_bronze_source(
 ) -> int:
     """Carrega uma unica origem bronze ja alinhada ao contrato canonico."""
     get_source_schema(load.source_name)
+    input_row_count = int(load.df.count())
+    if input_row_count == 0:
+        return 0
+
     bronze_df = append_bronze_events(
         df=load.df,
         source_name=load.source_name,

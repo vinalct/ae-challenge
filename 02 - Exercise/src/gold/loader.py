@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 from pyspark.sql import DataFrame, SparkSession
 
+from common.load_mode import FULL_REFRESH_MODE, INCREMENTAL_MODE
 from common.sql import execute_sql_file
 from .contracts import GOLD_PURCHASE_STATE_SNAPSHOT_TABLE, SILVER_INPUT_TABLES
 from .purchase_snapshot import build_purchase_state_snapshot_dataframe
@@ -62,6 +64,8 @@ def load_purchase_state_snapshot(
     namespace: str,
     catalog: str | None = None,
     snapshot_created_at: str | None = None,
+    load_mode: str = FULL_REFRESH_MODE,
+    target_snapshot_date: date | None = None,
 ) -> int:
     """Materializa o snapshot gold de estado da compra a partir da silver."""
     silver_dataframes = _read_silver_dataframes(
@@ -72,6 +76,7 @@ def load_purchase_state_snapshot(
     snapshot_df = build_purchase_state_snapshot_dataframe(
         silver_dataframes=silver_dataframes,
         snapshot_created_at=snapshot_created_at,
+        target_snapshot_date=(target_snapshot_date if load_mode == INCREMENTAL_MODE else None),
     )
     full_table_name = build_table_name(
         namespace=namespace,
@@ -79,6 +84,15 @@ def load_purchase_state_snapshot(
         catalog=catalog,
     )
     row_count = int(snapshot_df.count())
-    spark.sql(f'DELETE FROM {full_table_name} WHERE 1 = 1')
-    snapshot_df.writeTo(full_table_name).append()
+    if load_mode == INCREMENTAL_MODE:
+        if target_snapshot_date is None:
+            raise ValueError('target_snapshot_date is required when load_mode=incremental.')
+        spark.sql(
+            f"DELETE FROM {full_table_name} WHERE snapshot_date = DATE '{target_snapshot_date.isoformat()}'"
+        )
+    else:
+        spark.sql(f'DELETE FROM {full_table_name} WHERE 1 = 1')
+
+    if row_count > 0:
+        snapshot_df.writeTo(full_table_name).append()
     return row_count

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 from typing import Final
 
@@ -56,6 +57,16 @@ def _align_to_source_schema(
     return raw_df.select(expressions)
 
 
+def _filter_transaction_date(
+    df: DataFrame,
+    target_transaction_date: date | None,
+) -> DataFrame:
+    """Filtra a amostra para uma unica transaction_date quando o incremental estiver ativo."""
+    if target_transaction_date is None:
+        return df
+    return df.where(F.col('transaction_date') == F.lit(target_transaction_date).cast('date'))
+
+
 def _build_purchase_lookup(purchase_df: DataFrame) -> DataFrame:
     """Mantem o prod_item_id mais recente por purchase_id para a amostra."""
     window = Window.partitionBy('purchase_id').orderBy(
@@ -70,20 +81,27 @@ def _build_purchase_lookup(purchase_df: DataFrame) -> DataFrame:
     )
 
 
-def _build_purchase_load(data_dir: Path, spark: SparkSession) -> BronzeLoad:
+def _build_purchase_load(
+    data_dir: Path,
+    spark: SparkSession,
+    target_transaction_date: date | None = None,
+) -> BronzeLoad:
     """Prepara a carga da origem purchase a partir da pasta data."""
     source_path = data_dir / SAMPLE_SOURCE_FILES['purchase']
     if not source_path.exists():
         raise FileNotFoundError(f'Arquivo obrigatorio nao encontrado: {source_path}')
 
     raw_df = _read_sample_txt(spark, source_path)
-    normalized_df = _align_to_source_schema(
-        raw_df=raw_df,
-        source_name='purchase',
-        default_values={
-            'purchase_partition': DEFAULT_SAMPLE_PARTITION,
-            'prod_item_partition': DEFAULT_SAMPLE_PARTITION,
-        },
+    normalized_df = _filter_transaction_date(
+        _align_to_source_schema(
+            raw_df=raw_df,
+            source_name='purchase',
+            default_values={
+                'purchase_partition': DEFAULT_SAMPLE_PARTITION,
+                'prod_item_partition': DEFAULT_SAMPLE_PARTITION,
+            },
+        ),
+        target_transaction_date=target_transaction_date,
     )
     return BronzeLoad(source_name='purchase', df=normalized_df, source_file=str(source_path))
 
@@ -92,6 +110,7 @@ def _build_product_item_load(
     data_dir: Path,
     spark: SparkSession,
     purchase_lookup: DataFrame,
+    target_transaction_date: date | None = None,
 ) -> BronzeLoad:
     """Prepara a carga da origem product_item usando a amostra simplificada."""
     source_path = data_dir / SAMPLE_SOURCE_FILES['product_item']
@@ -103,10 +122,13 @@ def _build_product_item_load(
         joined_df = raw_df
     else:
         joined_df = raw_df.join(purchase_lookup, on='purchase_id', how='left')
-    normalized_df = _align_to_source_schema(
-        raw_df=joined_df,
-        source_name='product_item',
-        default_values={'prod_item_partition': DEFAULT_SAMPLE_PARTITION},
+    normalized_df = _filter_transaction_date(
+        _align_to_source_schema(
+            raw_df=joined_df,
+            source_name='product_item',
+            default_values={'prod_item_partition': DEFAULT_SAMPLE_PARTITION},
+        ),
+        target_transaction_date=target_transaction_date,
     )
     if normalized_df.where(F.col('prod_item_id').isNull()).limit(1).count() > 0:
         raise ValueError(
@@ -115,17 +137,24 @@ def _build_product_item_load(
     return BronzeLoad(source_name='product_item', df=normalized_df, source_file=str(source_path))
 
 
-def _build_purchase_extra_info_load(data_dir: Path, spark: SparkSession) -> BronzeLoad:
+def _build_purchase_extra_info_load(
+    data_dir: Path,
+    spark: SparkSession,
+    target_transaction_date: date | None = None,
+) -> BronzeLoad:
     """Prepara a carga da origem purchase_extra_info a partir da amostra."""
     source_path = data_dir / SAMPLE_SOURCE_FILES['purchase_extra_info']
     if not source_path.exists():
         raise FileNotFoundError(f'Arquivo obrigatorio nao encontrado: {source_path}')
 
     raw_df = _read_sample_txt(spark, source_path)
-    normalized_df = _align_to_source_schema(
-        raw_df=raw_df,
-        source_name='purchase_extra_info',
-        default_values={'purchase_partition': DEFAULT_SAMPLE_PARTITION},
+    normalized_df = _filter_transaction_date(
+        _align_to_source_schema(
+            raw_df=raw_df,
+            source_name='purchase_extra_info',
+            default_values={'purchase_partition': DEFAULT_SAMPLE_PARTITION},
+        ),
+        target_transaction_date=target_transaction_date,
     )
     return BronzeLoad(
         source_name='purchase_extra_info',
@@ -137,6 +166,7 @@ def _build_purchase_extra_info_load(data_dir: Path, spark: SparkSession) -> Bron
 def _build_order_transaction_cost_hist_load(
     data_dir: Path,
     spark: SparkSession,
+    target_transaction_date: date | None = None,
 ) -> BronzeLoad | None:
     """Prepara a carga opcional de order_transaction_cost_hist."""
     source_path = data_dir / SAMPLE_SOURCE_FILES['order_transaction_cost_hist']
@@ -148,10 +178,13 @@ def _build_order_transaction_cost_hist_load(
         return None
 
     raw_df = _read_sample_txt(spark, source_path)
-    normalized_df = _align_to_source_schema(
-        raw_df=raw_df,
-        source_name='order_transaction_cost_hist',
-        default_values={'purchase_partition': DEFAULT_SAMPLE_PARTITION},
+    normalized_df = _filter_transaction_date(
+        _align_to_source_schema(
+            raw_df=raw_df,
+            source_name='order_transaction_cost_hist',
+            default_values={'purchase_partition': DEFAULT_SAMPLE_PARTITION},
+        ),
+        target_transaction_date=target_transaction_date,
     )
     return BronzeLoad(
         source_name='order_transaction_cost_hist',
@@ -163,13 +196,18 @@ def _build_order_transaction_cost_hist_load(
 def build_sample_bronze_loads(
     spark: SparkSession,
     data_dir: str | Path,
+    target_transaction_date: date | None = None,
 ) -> list[BronzeLoad]:
     """Monta as cargas bronze a partir dos arquivos de exemplo da pasta data."""
     data_dir_path = Path(data_dir)
     if not data_dir_path.exists():
         raise FileNotFoundError(f'Pasta de dados nao encontrada: {data_dir_path}')
 
-    purchase_load = _build_purchase_load(data_dir=data_dir_path, spark=spark)
+    purchase_load = _build_purchase_load(
+        data_dir=data_dir_path,
+        spark=spark,
+        target_transaction_date=target_transaction_date,
+    )
     purchase_lookup = _build_purchase_lookup(purchase_load.df)
     loads = [
         purchase_load,
@@ -177,11 +215,20 @@ def build_sample_bronze_loads(
             data_dir=data_dir_path,
             spark=spark,
             purchase_lookup=purchase_lookup,
+            target_transaction_date=target_transaction_date,
         ),
-        _build_purchase_extra_info_load(data_dir=data_dir_path, spark=spark),
+        _build_purchase_extra_info_load(
+            data_dir=data_dir_path,
+            spark=spark,
+            target_transaction_date=target_transaction_date,
+        ),
     ]
 
-    optional_load = _build_order_transaction_cost_hist_load(data_dir=data_dir_path, spark=spark)
+    optional_load = _build_order_transaction_cost_hist_load(
+        data_dir=data_dir_path,
+        spark=spark,
+        target_transaction_date=target_transaction_date,
+    )
     if optional_load is not None:
         loads.append(optional_load)
 
