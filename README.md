@@ -189,6 +189,7 @@ Abaixo está o mapeamento direto entre o que o desafio pede e os arquivos que at
 | --- | --- |
 | ETL em PySpark | [src/bronze](./02%20-%20Exercise/src/bronze), [src/silver](./02%20-%20Exercise/src/silver), [src/gold](./02%20-%20Exercise/src/gold), [src/ops](./02%20-%20Exercise/src/ops) |
 | DDL da tabela final histórica | [gold_gmv_daily_by_subsidiary_snapshot.sql](./02%20-%20Exercise/sql/ddl/gold_gmv_daily_by_subsidiary_snapshot.sql) |
+| SQL da view de acesso ao snapshot atual | [vw_gmv_daily_by_subsidiary_current.sql](./02%20-%20Exercise/sql/access/vw_gmv_daily_by_subsidiary_current.sql) |
 | Query SQL para consumo atual do GMV diário por subsidiária | [select_current_gmv_daily_by_subsidiary.sql](./02%20-%20Exercise/sql/access/select_current_gmv_daily_by_subsidiary.sql) |
 | Exemplo da tabela final populada | [gold_gmv_daily_by_subsidiary_snapshot_example.csv](./02%20-%20Exercise/examples/gold_gmv_daily_by_subsidiary_snapshot_example.csv) |
 | Regras de negócio e interpretação da métrica | [business_rules_and_source_contracts.md](./02%20-%20Exercise/docs/business_rules_and_source_contracts.md) |
@@ -235,18 +236,20 @@ O desafio menciona componentes operacionais complementares, mas eles foram apena
 
 ## Exemplo da Saída Final Entregue
 
-O arquivo [gold_gmv_daily_by_subsidiary_snapshot_example.csv](./02%20-%20Exercise/examples/gold_gmv_daily_by_subsidiary_snapshot_example.csv) é um recorte pequeno e intencional da tabela final histórica. Ele foi incluído como evidência do formato final publicado, e não como representação exaustiva de todos os cenários de negócio modelados na pipeline.
+O arquivo [gold_gmv_daily_by_subsidiary_snapshot_example.csv](./02%20-%20Exercise/examples/gold_gmv_daily_by_subsidiary_snapshot_example.csv) foi montado como um recorte histórico intencional da tabela final para mostrar, no próprio artefato entregue, os cenários mais importantes da solução.
 
 Esse CSV demonstra de forma objetiva:
 
 - o grão da saída final: uma linha por `snapshot_date`, `gmv_date` e `subsidiary`
 - a presença de histórico diário por `snapshot_date`
-- o carry-forward do mesmo `gmv_date` em snapshots consecutivos enquanto o estado permanece elegível
-- o formato final que o consumidor da tabela recebe, com métricas, status de qualidade e `snapshot_created_at`
+- a compra `55` entrando no GMV somente após a chegada de `purchase_extra_info`
+- a compra `69` entrando no GMV quando a informação complementar passa a existir
+- a mudança de `subsidiary` da compra `69` entre `2023-03-11` e `2023-03-12`
+- a navegação histórica em `2023-03-31`, com estado coerente para os valores de janeiro e fevereiro
+- o efeito do reembolso da compra `55`, que deixa de aparecer no snapshot de `2023-07-15`
+- o formato final que o consumidor recebe, com métricas, status de qualidade e `snapshot_created_at`
 
-Os demais comportamentos históricos relevantes da solução, como chegada tardia de dados complementares, mudança posterior de subsidiária, inelegibilidade e reembolso, fazem parte da lógica implementada da pipeline, mas não aparecem todos simultaneamente neste CSV de exemplo porque o artefato entregue foi mantido propositalmente pequeno para facilitar revisão rápida.
-
-Em outras palavras: o CSV entregue comprova o formato e um slice real da saída histórica; a cobertura completa dos requisitos históricos está na modelagem implementada e descrita nas seções deste `README.md`.
+Com isso, o exemplo entregue não mostra apenas o layout da tabela: ele também evidencia, no próprio CSV, chegada tardia de dados, carry-forward, mudança posterior de dimensão e preservação do histórico publicado por `snapshot_date`.
 
 ## Como Executar Localmente
 
