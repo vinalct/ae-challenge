@@ -233,15 +233,20 @@ O desafio menciona componentes operacionais complementares, mas eles foram apena
 - notificações para data owners via Slack ou email
 - frameworks gerenciados de expectativas, como Great Expectations ou Deequ
 
-## Exemplo de Comportamento Histórico Coberto
+## Exemplo da Saída Final Entregue
 
-O exemplo populado em [gold_gmv_daily_by_subsidiary_snapshot_example.csv](./02%20-%20Exercise/examples/gold_gmv_daily_by_subsidiary_snapshot_example.csv) foi incluído para facilitar a revisão e mostrar os cenários que o desafio pedia:
+O arquivo [gold_gmv_daily_by_subsidiary_snapshot_example.csv](./02%20-%20Exercise/examples/gold_gmv_daily_by_subsidiary_snapshot_example.csv) é um recorte pequeno e intencional da tabela final histórica. Ele foi incluído como evidência do formato final publicado, e não como representação exaustiva de todos os cenários de negócio modelados na pipeline.
 
-- a compra `55` só se torna elegível depois da chegada de `purchase_extra_info`
-- a compra `69` só entra no GMV quando a informação complementar chega em um snapshot posterior
-- a compra `69` muda de subsidiária em um snapshot posterior, mostrando correção tardia
-- a compra `55` deixa de compor o GMV atual quando passa a `REEMBOLSADA`
-- a compra `56` nunca entra no GMV porque não se torna elegível
+Esse CSV demonstra de forma objetiva:
+
+- o grão da saída final: uma linha por `snapshot_date`, `gmv_date` e `subsidiary`
+- a presença de histórico diário por `snapshot_date`
+- o carry-forward do mesmo `gmv_date` em snapshots consecutivos enquanto o estado permanece elegível
+- o formato final que o consumidor da tabela recebe, com métricas, status de qualidade e `snapshot_created_at`
+
+Os demais comportamentos históricos relevantes da solução, como chegada tardia de dados complementares, mudança posterior de subsidiária, inelegibilidade e reembolso, fazem parte da lógica implementada da pipeline, mas não aparecem todos simultaneamente neste CSV de exemplo porque o artefato entregue foi mantido propositalmente pequeno para facilitar revisão rápida.
+
+Em outras palavras: o CSV entregue comprova o formato e um slice real da saída histórica; a cobertura completa dos requisitos históricos está na modelagem implementada e descrita nas seções deste `README.md`.
 
 ## Como Executar Localmente
 
