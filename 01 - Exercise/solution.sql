@@ -10,20 +10,45 @@ Premissas adotadas:
    Se no ambiente real esse campo representar valor unitário, a fórmula correta passa a ser:
    `item_quantity * purchase_value`.
 6. A segunda pergunta não explicita recorte de tempo, então a consulta considera todo o histórico aprovado.
+7. Antes das agregações, a consulta remove apenas duplicatas exatas no grão disponível.
+   Isso evita inflar GMV sem assumir regras de desempate que não foram informadas.
 */
 
 /* ============================================================
    1) 50 maiores produtores em faturamento em 2021
    ============================================================ */
+WITH purchase_dedup AS (
+    SELECT DISTINCT
+        purchase_id,
+        purchase_partition,
+        producer_id,
+        prod_item_id,
+        prod_item_partition,
+        purchase_total_value,
+        purchase_status,
+        release_date
+    FROM
+        purchase
+),
+approved_purchases_2021 AS (
+    SELECT
+        purchase_id,
+        purchase_partition,
+        producer_id,
+        purchase_total_value
+    FROM
+        purchase_dedup
+    WHERE
+        purchase_status = 'APROVADA'
+        AND release_date >= DATE '2021-01-01'
+        AND release_date < DATE '2022-01-01'
+)
+
 SELECT
     producer_id,
     SUM(COALESCE(purchase_total_value, 0)) AS revenue_2021
 FROM
-    purchase
-WHERE
-    purchase_status = 'APROVADA'
-    AND release_date >= DATE '2021-01-01'
-    AND release_date < DATE '2022-01-01'
+    approved_purchases_2021
 GROUP BY
     producer_id
 ORDER BY
@@ -35,20 +60,43 @@ LIMIT 50;
 /* ============================================================
    2) 2 produtos com maior faturamento de cada produtor
    ============================================================ */
-WITH approved_sales AS (
+WITH purchase_dedup AS (
+    SELECT DISTINCT
+        purchase_id,
+        purchase_partition,
+        producer_id,
+        prod_item_id,
+        prod_item_partition,
+        purchase_status
+    FROM
+        purchase
+),
+
+product_item_dedup AS (
+    SELECT DISTINCT
+        prod_item_id,
+        prod_item_partition,
+        product_id,
+        purchase_value
+    FROM
+        product_item
+),
+
+approved_sales AS (
     SELECT
         purchase.producer_id,
         product_item.product_id,
         COALESCE(product_item.purchase_value, 0) AS item_revenue
     FROM
-        purchase
+        purchase_dedup AS purchase
     INNER JOIN
-        product_item
+        product_item_dedup AS product_item
             ON purchase.prod_item_id = product_item.prod_item_id
             AND purchase.prod_item_partition = product_item.prod_item_partition
     WHERE
         purchase.purchase_status = 'APROVADA'
 ),
+
 product_revenue AS (
     SELECT
         producer_id,
@@ -60,6 +108,7 @@ product_revenue AS (
         producer_id,
         product_id
 ),
+
 ranked_products AS (
     SELECT
         producer_id,
@@ -72,6 +121,7 @@ ranked_products AS (
     FROM
         product_revenue
 )
+
 SELECT
     producer_id,
     product_id,
